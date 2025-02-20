@@ -12,24 +12,39 @@ def webhook():
     # 接收來自 IFTTT 的 JSON 資料
     body = request.get_json()
     group_id = body.get("groupId")  # 來自 IFTTT 的群組 ID
-    message = body.get("message")   # 來自 IFTTT 的訊息內容
+    text_message = body.get("message")   # 來自 IFTTT 的文字訊息內容
+    image_url = body.get("imageUrl")  # 來自 IFTTT 的圖片 URL
     
-    if group_id and message:
+    if group_id and (text_message or image_url):
+        messages = []
+        
+        # 加入文字訊息（如果存在）
+        if text_message:
+            messages.append({"type": "text", "text": text_message})
+        
+        # 加入圖片訊息（如果存在）
+        if image_url:
+            messages.append({
+                "type": "image",
+                "originalContentUrl": image_url,
+                "previewImageUrl": image_url
+            })
+        
         # 發送訊息到指定群組
-        push_message_to_group(group_id, message)
+        push_message_to_group(group_id, messages)
         return jsonify({'status': 'success'}), 200
     else:
         # 如果資料不完整，回應錯誤
-        return jsonify({'status': 'error', 'message': 'Missing groupId or message'}), 400
+        return jsonify({'status': 'error', 'message': 'Missing groupId, message, or imageUrl'}), 400
 
-def push_message_to_group(group_id, message):
+def push_message_to_group(group_id, messages):
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
     }
     data = {
         'to': group_id,
-        'messages': [{'type': 'text', 'text': message}]
+        'messages': messages  # 支援多訊息陣列
     }
     # 發送 HTTP POST 請求到 LINE Messaging API 的 Push Message 端點
     response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data)
